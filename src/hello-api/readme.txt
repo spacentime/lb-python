@@ -1,9 +1,9 @@
-Install packages using command line and not PowerShell for some reason
-> pip install flask
+Install packages
+> pip install Flask
 
 Run App
 > py app.py
 
 Run unit tests
 
-> py -m unittest test_app.py
+> py -m unittest -v test_app.py
