@@ -5,6 +5,9 @@ Install Single pakcage
 
 Run App
 > py app.py
+Run App with specific version of python  (for example 3.7)
+> py -3.7 app.py
+
 
 Run unit tests
 
