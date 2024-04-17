@@ -1,4 +1,6 @@
-Install packages
+Install all packages
+> pip3 install --force-reinstall -r requirements.txt
+Install Single pakcage
 > pip install Flask
 
 Run App
