@@ -17,9 +17,7 @@ template = {
     },
     "termsOfService": "http://me.com/terms",
     "version": "0.0.1"
-  },
-  "host": "mysite.com",  # overrides localhost:500
-  "basePath": "/api",  # base bash for blueprint registration
+  },  
   "schemes": [
     "http",
     "https"
@@ -29,6 +27,7 @@ template = {
 
 app = Flask(__name__)
 swagger = Swagger(app, template=template)
+# swagger = Swagger(app)
 
 @app.route('/')
 def hello():
