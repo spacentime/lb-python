@@ -4,10 +4,25 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+class AppConfig():
+    @property
+    def port_number(self) -> int:
+        return 8080
+    
+    @property
+    def localhost(self):
+        return 'localhost'
+    
+    @property
+    def debugMode(self) -> bool:
+        return True
+
+_appConfig = AppConfig()
+
 template = {
   "swagger": "2.0",
   "info": {
-    "title": "Hello Swagger UI demo",
+    "title": "Swagger UI Demo API App",
     "description": "API for demo swagger UI",
     "contact": {
       "responsibleOrganization": "XGP Consulting Inc",
@@ -21,13 +36,35 @@ template = {
   "schemes": [
     "http",
     "https"
-  ],
-  "operationId": "getmyData"
+  ]
 }
 
 app = Flask(__name__)
 swagger = Swagger(app, template=template)
 # swagger = Swagger(app)
+
+@app.route('/health', methods=['GET'])
+def health():
+    """Return healt check status
+    ---
+    tags:
+      - Health
+    definitions:
+      HealthResponse:
+        type: string        
+    responses:
+      200:
+        description: Returns the application health status
+        schema:
+          $ref: '#/definitions/HealthResponse'
+        examples:
+          health_response:
+            "i am alive:8080"
+
+    """
+    ret = f'I am alive:{_appConfig.port_number}'
+    logger.info(f'Call to /health returns: "{ret}"')
+    return ret
 
 @app.route('/')
 def hello():
@@ -38,6 +75,9 @@ def colors(palette):
     """Example endpoint returning a list of colors by palette
     This is using docstrings for specifications.
     ---
+    tags:
+      - Colors
+
     parameters:
       - name: palette
         in: path
@@ -74,34 +114,132 @@ def colors(palette):
 
     return jsonify(result)
 
-@app.route('/clients/<clientid>', methods=['POST'])
-def set_client(clientid):
-    """Example endpoint to update a client    
+
+    
+# example 
+# host/customer/1?all=true&sampleMode=false
+    
+@app.route('/customer/<id>', methods=['GET'])
+def sampler_get(id):
+    """endpoint returning a list of audit sample accounts from daily edit accounts    
     ---    
+    tags:
+      - Customer
     parameters:
-      - in: path
-        name: clientid
+      - name: id
+        in: path
         type: string
         required: true
-      - name: client
-        in: body
-        type: json
-        required: true
         value:         
-        description: json object to includ sql driver settings   
+        description: please enter customer id      
+      - name: all
+        in: query
+        type: string
+        required: false
+        value: 
+        description: lookg through all customers or not
+      - name: sampleMode
+        in: query
+        type: string
+        required: false
+        value: 
+        description: sample mode true/false
+            
     definitions:
-      body:       
+      address: 
         type: object
-        $ref: '#/definitions/client'
-      client:
+        properties:
+          street:
+            type: string
+            description: Street address
+          city:
+            type: string            
+            description: City Name
+      customer:
         type: object
         properties:
           first_name:
             type: string
+            description: customer first name
+          address:
+            type: array
             items:
-              $ref: '#/definitions/Color'
-      Color:
+              $ref: '#/definitions/address'      
+    responses:
+      200:
+        description: A list of accounts (randomized accounts from edit inventory)
+        schema:
+          $ref: '#/definitions/customer'
+        examples:
+          customer:
+            {
+              "first_name": "Liran",
+              "address": 
+                {
+                  "street": "111 Washington Ave",
+                  "city": "Miami",
+                }
+            }            
+
+      204:
+          description: No Content is available (Returns empty if data is not available)
+      400:
+          description: Any error occured 
+    """
+                
+    value ={
+      "customer":
+        {
+          "first_name": "Liran",
+          "address": 
+            {
+              "street": "111 Washington Ave",
+              "city": "Miami",
+            }
+        }           
+    }    
+    ret = jsonify(value)
+    return ret
+
+class BadRequest(BaseException): ...    
+
+class Validate():    
+    def isObj(self, obj):
+      if type(obj) != dict:
+        raise BadRequest('body must be a json object')
+    
+    def has(self, obj:dict, name: str) -> None:
+      if name not in obj:
+        raise BadRequest('bad json request, need to have sqldriver property')       
+
+     
+_validate = Validate()
+
+@app.route('/customer/<id>', methods=['POST'])
+def set_client(id):
+    """Example endpoint to update a client    
+    ---
+    tags:
+      - Customer
+        
+    parameters:
+      - name: id
+        in: path
         type: string
+        required: true
+        value:         
+        description: please enter customer id      
+      - name: client
+        in: body
+        schema:
+          $ref: '#/definitions/customer'        
+        type: json
+        required: true        
+        description: customer json object
+    definitions:
+      body:       
+        type: object
+        $ref: '#/definitions/customer'      
     responses:
       200:
         description: A list of accounts (randomized accounts for requested users)
@@ -115,173 +253,21 @@ def set_client(clientid):
     logger = logging.getLogger(__name__)
     try:
       logger.info('set_sql_driver start')        
-      if type(request.json) != dict:
-          return jsonify({'error': 'body must be a json object'}), 400
-      if 'sqldriver' not in request.json:
-          return jsonify({'error': 'bad json request, need to have sqldriver property'}), 400
       
-      sqldriver = request.json['sqldriver']        
+      _validate.isObj(request.json)
+      _validate.has(request.json, "first_name")
+      _validate.has(request.json, "address")
+                  
+      request.json['first_name'] = request.json['first_name'] + ' indeed!'
     
-      return jsonify(sqldriver)
-    except Exception as user_sampler_ex:
-      print('unhandled exception at forming random user' + str(user_sampler_ex))
-      return jsonify({'error': str(user_sampler_ex)}), 500    
+      return jsonify(request.json)
     
-@app.route('/audit/v2/sampler/<botid>', methods=['GET'])
-def audit_sampler(botid):
-    """endpoint returning a list of audit sample accounts from daily edit accounts    
-    ---    
-    parameters:
-      - name: botid
-        in: path
-        type: string
-        required: true
-        value:         
-        description: please enter botid      
-      - name: tableId
-        in: query
-        type: string
-        required: true
-        value: 
-        description: 1 == Billing_Edits(Required sample mode[0 or 1]); 2 == Billing_Assurance;3 == Billing_eRequest;
-      - name: sampleMode
-        in: query
-        type: string
-        required: false
-        value: 
-        description: required when tableId ==1 [0 == edits assigned to Auditors and Analysts based on their sample percentage are set; 1== edits assigned to Auditors will be assigned to Analysts]
-            
-    definitions:
-      audit_sampler:
-        type: object
-        properties:
-          audit_sampler:
-            type: array
-            items:
-              $ref: '#/definitions/audit_sampler'      
-    responses:
-      200:
-        description: A list of accounts (randomized accounts from edit inventory)
-        schema:
-          $ref: '#/definitions/audit_sampler'
-        examples:
-           {
-            "botID": "d290f1ee-6c54-4b01-90e6-d701748f0851",
-            "tableID": "1",
-            "data": [
-                {
-                    "auditType": "Billing_Edits",
-                    "pasCOID": "08591",
-                    "sourceKeyID": "EA84DF91-BF15-E911-B73A-0025B5A0165A",
-                    "assignedID": "CPU8447",
-                    "firstName": "Marianne",
-                    "lastName": "Marty",
-                    "role": "Auditor"
-                },
-                {
-                    "auditType": "Billing_Edits",
-                    "pasCOID": "08591",
-                    "sourceKeyID": "6D90DF91-BF15-E911-B73A-0025B5A0165A",
-                    "assignedID": "nqe6706",
-                    "firstName": "Blake",
-                    "lastName": "Boerger",
-                    "role": "Auditor"
-                }
-            ]
-        }
-
-    204:
-        description: No Content is available (Returns empty if data is not available)
-    400:
-        description: Any error occured 
-    """
-        
-    logger.info(f'Start audit_sampler botid: "{botid}"')
-    
-    value = [
-                {
-                    "auditType": "Billing_Edits",
-                    "pasCOID": "08591",
-                    "sourceKeyID": "EA84DF91-BF15-E911-B73A-0025B5A0165A",
-                    "assignedID": "CPU8447",
-                    "firstName": "Marianne",
-                    "lastName": "Marty",
-                    "role": "Auditor"
-                },
-                {
-                    "auditType": "Billing_Edits",
-                    "pasCOID": "08591",
-                    "sourceKeyID": "6D90DF91-BF15-E911-B73A-0025B5A0165A",
-                    "assignedID": "nqe6706",
-                    "firstName": "Blake",
-                    "lastName": "Boerger",
-                    "role": "Auditor"
-                }
-            ]         
-    ret = jsonify(value)
-    return ret
-
-@app.route('/audit/v2/accounts/reassignment', methods=['POST'])
-def user_sampler():
-    """endpoint returning a list of audit assignments for requested users    
-    ---    
-    parameters:
-      - name: body
-        in: body
-        type: string
-        required: true
-        value:         
-        description: List of accountIds and userIds need to supply to get random assignments for all accounts
-    definitions:
-      user_sampler:
-        type: object
-        properties:
-          user_sampler:
-            type: array
-            items:
-              $ref: '#/definitions/audit_sampler'      
-    responses:
-      200:
-        description: A list of accounts (randomized accounts for requested users)
-        schema:
-          $ref: '#/definitions/user_sampler'
-        examples:
-           {
-    "assignments": [
-          {
-              "accountId": "6AA851E0-DF19-E911-B737-00505688AFF6",
-              "userId": "LUD8931"
-          },
-          {
-              "accountId": "CEA751E0-DF19-E911-B737-00505688AFF6",
-              "userId": "DWO8538"
-          },
-          {
-              "accountId": "20A851E0-DF19-E911-B737-00505688AFF6",
-              "userId": "CLO9627"
-          },
-          {
-              "accountId": "3CA851E0-DF19-E911-B737-00505688AFF6",
-              "userId": "DWO8538"
-          }
-      ]
-    }
-    
-    204:
-        description: No Content is available (Returns empty if data is not available)
-    400:
-        description: Any error occured 
-    """
-
-    logger.info('Start user_sampler')
-    output_json = jsonify({ "bob": "smith"})
-    try:
-        
-        raise "Oops WTH happened?"
-    except Exception as user_sampler_ex:
-        logger.error('unhandled exception at forming random user' + str(user_sampler_ex))
-        return jsonify({'error': str(user_sampler_ex)}), 400
-    return jsonify(output_json)
+    except BadRequest as ex:
+      return jsonify({'error': str(ex)}), 400      
+    except Exception as ex:
+      print('unhandled exception at forming random user' + str(ex))
+      return jsonify({'error': str(ex)}), 500
 
 if __name__ == '__main__':
-    app.run('localhost', debug=True, port=8080)
+    logger.info('Host: {_appConfig.localhost}, Debug: {_appConfig.debugMode}, Port Number: _appConfig.port_number' )               
+    app.run(_appConfig.localhost, debug=_appConfig.debugMode, port=_appConfig.port_number)
